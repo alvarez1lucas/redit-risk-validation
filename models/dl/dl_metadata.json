@@ -1,0 +1,28 @@
+{
+  "tabular_nn": {
+    "gini": 0.4966,
+    "architecture": [
+      256,
+      128,
+      64
+    ],
+    "dropout": 0.3
+  },
+  "autoencoder": {
+    "latent_dim": 32,
+    "anomaly_threshold": 0.03988043591380119,
+    "pct_flagged": 0.05081052956766337,
+    "default_rate_atipicos": 0.10144,
+    "default_rate_tipicos": 0.07961903456781665
+  },
+  "lstm": {
+    "gini": 0.2061,
+    "seq_length": 12,
+    "hidden_size": 64,
+    "coverage": 0.9482626863730225
+  },
+  "ensemble_xgb_nn": {
+    "gini": 0.5174,
+    "method": "simple_average"
+  }
+}

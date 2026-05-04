@@ -1,0 +1,8 @@
+{
+  "psi_alert_threshold": 0.1,
+  "psi_retrain_threshold": 0.25,
+  "reference_score_mean": 0.39083442091941833,
+  "reference_score_std": 0.21062694489955902,
+  "reference_default_rate": 0.08072908198107379,
+  "n_reference_rows": 246008
+}

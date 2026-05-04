@@ -1,0 +1,30 @@
+{
+  "base_value": -0.501,
+  "top_factors": [
+    {
+      "feature": "AMT_GOODS_PRICE",
+      "shap_value": -0.4808,
+      "direction": "reduce_riesgo"
+    },
+    {
+      "feature": "DAYS_EMPLOYED",
+      "shap_value": 0.2655,
+      "direction": "aumenta_riesgo"
+    },
+    {
+      "feature": "EXT_SOURCE_3",
+      "shap_value": 0.1941,
+      "direction": "aumenta_riesgo"
+    },
+    {
+      "feature": "AMT_ANNUITY",
+      "shap_value": 0.1564,
+      "direction": "aumenta_riesgo"
+    },
+    {
+      "feature": "NAME_EDUCATION_TYPE_Higher education",
+      "shap_value": -0.1492,
+      "direction": "reduce_riesgo"
+    }
+  ]
+}

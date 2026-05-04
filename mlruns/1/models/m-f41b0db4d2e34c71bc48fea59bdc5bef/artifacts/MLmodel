@@ -1,0 +1,23 @@
+artifact_path: file:///F:/Home-credit-default/homecredit-model-validation/mlruns/1/models/m-f41b0db4d2e34c71bc48fea59bdc5bef/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.pkl
+    predict_fn: predict
+    python_version: 3.11.3
+  sklearn:
+    code: null
+    pickled_model: model.pkl
+    serialization_format: cloudpickle
+    sklearn_version: 1.8.0
+    skops_trusted_types: null
+mlflow_version: 3.11.1
+model_id: m-f41b0db4d2e34c71bc48fea59bdc5bef
+model_size_bytes: 1629967
+model_uuid: m-f41b0db4d2e34c71bc48fea59bdc5bef
+prompts: null
+run_id: f7e39481a2ed48c2ada647cf6011fc65
+utc_time_created: '2026-04-12 16:50:35.038768'
