@@ -1,0 +1,55 @@
+{
+  "dataset": "Home Credit Default Risk",
+  "n_train": 246008,
+  "n_test": 61503,
+  "numeric_features": [
+    "AMT_CREDIT",
+    "AMT_ANNUITY",
+    "AMT_INCOME_TOTAL",
+    "AMT_GOODS_PRICE",
+    "DAYS_BIRTH",
+    "DAYS_EMPLOYED",
+    "DAYS_REGISTRATION",
+    "DAYS_ID_PUBLISH",
+    "EXT_SOURCE_1",
+    "EXT_SOURCE_2",
+    "EXT_SOURCE_3",
+    "CNT_CHILDREN",
+    "CNT_FAM_MEMBERS",
+    "REGION_POPULATION_RELATIVE",
+    "HOUR_APPR_PROCESS_START",
+    "REGION_RATING_CLIENT",
+    "REGION_RATING_CLIENT_W_CITY",
+    "OWN_CAR_AGE",
+    "DEF_30_CNT_SOCIAL_CIRCLE",
+    "DEF_60_CNT_SOCIAL_CIRCLE",
+    "DAYS_LAST_PHONE_CHANGE",
+    "AMT_REQ_CREDIT_BUREAU_YEAR"
+  ],
+  "categorical_features": [
+    "NAME_CONTRACT_TYPE",
+    "NAME_INCOME_TYPE",
+    "NAME_EDUCATION_TYPE",
+    "NAME_FAMILY_STATUS",
+    "NAME_HOUSING_TYPE",
+    "OCCUPATION_TYPE",
+    "ORGANIZATION_TYPE",
+    "WEEKDAY_APPR_PROCESS_START",
+    "FONDKAPREMONT_MODE",
+    "HOUSETYPE_MODE",
+    "WALLSMATERIAL_MODE",
+    "EMERGENCYSTATE_MODE"
+  ],
+  "derived_features": [
+    "age_years",
+    "credit_income_ratio",
+    "annuity_income_ratio"
+  ],
+  "target": "default",
+  "protected_attributes": [
+    "CODE_GENDER",
+    "age_years"
+  ],
+  "default_rate_train": 0.08072908198107379,
+  "default_rate_test": 0.08072776937710356
+}
