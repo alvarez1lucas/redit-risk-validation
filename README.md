@@ -54,7 +54,9 @@ homecredit-model-validation/
 │   ├── 02_threshold_analysis.ipynb
 │   ├── 03_error_analysis.ipynb
 │   ├── 04_robustez_counterfactuals.ipynb
-│   └── 05_lifecycle_simulation.ipynb
+│   ├── 05_lifecycle_simulation.ipynb
+│   ├── 06_deep_learning.ipynb
+│   └── 07_advanced_validation (1).ipynb
 ├── docs/decisions/ADRs.py      # Architectural Decision Records
 ├── data/raw/                   # CSVs de Home Credit (no versionados)
 ├── models/champion/            # Artefactos del modelo
@@ -80,10 +82,12 @@ homecredit-model-validation/
 Correr `python run_all.py` primero. Después abrir las notebooks en orden:
 
 1. **01_eda.ipynb** — EDA completo. Completar celdas ✏️ con tus conclusiones.
-2. **02_threshold_analysis.ipynb** — Costo-beneficio del threshold.
+2. **02_threshold_analysis.ipynb** — Costo-beneficio del threshold (incluye análisis de distintos países).
 3. **03_error_analysis.ipynb** — Dónde y por qué falla el modelo.
 4. **04_robustez_counterfactuals.ipynb** — Consistencia y counterfactuals.
 5. **05_lifecycle_simulation.ipynb** — Simulación de 6 meses en producción.
+6. **06_deep_learning.ipynb** — Modelos de deep learning.
+7. **07_advanced_validation (1).ipynb** — Validación avanzada.
 
 ## Stack
 
