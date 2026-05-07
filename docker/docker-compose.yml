@@ -1,0 +1,112 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Credit Risk Model Validation Suite — Home Credit Default Risk
+# Services: API · Streamlit Dashboard · MLflow · Prometheus · Grafana
+#
+# Usage:
+#   docker-compose up              # start all services
+#   docker-compose up api          # start API only
+#   docker-compose up streamlit    # start dashboard only
+#   docker-compose down            # stop all
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── FastAPI scoring endpoint with SHAP explanation ─────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: credit-risk-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../models:/app/models:ro
+      - ../data/processed:/app/data/processed:ro
+      - ../reports:/app/reports:ro
+    environment:
+      - LOG_LEVEL=INFO
+    depends_on:
+      - mlflow
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/model/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Streamlit interactive dashboard ────────────────────────────────────────
+  streamlit:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.streamlit
+    container_name: credit-risk-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../models:/app/models:ro
+      - ../data/processed:/app/data/processed:ro
+      - ../reports:/app/reports:ro
+    environment:
+      - STREAMLIT_SERVER_HEADLESS=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  # ── MLflow experiment tracking ─────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.9.0
+    container_name: credit-risk-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    restart: unless-stopped
+
+  # ── Prometheus metrics collection ──────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: credit-risk-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    restart: unless-stopped
+
+  # ── Grafana monitoring dashboard ───────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: credit-risk-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  mlflow_data:
+  prometheus_data:
+  grafana_data:

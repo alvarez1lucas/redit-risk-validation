@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Source code
+COPY src/ ./src/
+
+# Model artifacts (copied at build time)
+# In production: use volumes or model registry instead
+COPY models/champion/model.pkl            ./models/champion/model.pkl
+COPY models/champion/shap_explainer.pkl   ./models/champion/shap_explainer.pkl
+COPY models/champion/model_metadata.json  ./models/champion/model_metadata.json
+COPY data/processed/preprocessor.pkl      ./data/processed/preprocessor.pkl
+COPY data/processed/feature_names.json   ./data/processed/feature_names.json
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/model/health || exit 1
+
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
