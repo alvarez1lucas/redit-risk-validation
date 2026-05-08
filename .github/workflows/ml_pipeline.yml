@@ -1,0 +1,225 @@
+name: Credit Risk — CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly drift check — Mondays 8am UTC
+    - cron: "0 8 * * 1"
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+
+  # ─── 1. Tests & code quality ───────────────────────────────────────────────
+  lint-and-test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing
+        continue-on-error: false
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage.xml
+        continue-on-error: true
+
+  # ─── 2. ML Pipeline — train, validate, fairness ───────────────────────────
+  ml-pipeline:
+    name: Train & Validate
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+    if: github.event_name == 'workflow_dispatch'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── Data: pull from DVC remote ─────────────────────────────────────────
+      # Uncomment when DVC remote is configured
+      # - name: Configure DVC remote
+      #   run: dvc remote modify myremote gdrive_credentials_file credentials.json
+      #   env:
+      #     GDRIVE_CREDENTIALS_DATA: ${{ secrets.GDRIVE_CREDENTIALS }}
+      #
+      # - name: Pull data from DVC
+      #   run: dvc pull --no-run-cache
+
+      # ── Run pipeline stages ────────────────────────────────────────────────
+      - name: Stage 1 — Ingest
+        run: python src/data/ingest.py
+
+      - name: Stage 2 — Features
+        run: python src/features/build.py
+
+      - name: Stage 3 — Train
+        run: python src/models/train.py
+
+      - name: Stage 4 — SR 11-7 Validation
+        run: python src/validation/sr117.py
+
+      - name: Stage 5 — Fairness Analysis
+        run: python src/governance/fairness.py
+
+      - name: Stage 6 — Explainability
+        run: python src/validation/explain.py
+
+      - name: Stage 7 — Drift Baseline
+        run: python src/monitoring/baseline.py
+
+      # ── Quality gate: SR 11-7 ─────────────────────────────────────────────
+      - name: Gate — SR 11-7 validation
+        run: |
+          python - <<'EOF'
+          import json, sys
+          with open("reports/validation_metrics.json") as f:
+              m = json.load(f)
+          print(f"Gini:      {m['gini']}")
+          print(f"AUC-ROC:   {m['auc_roc']}")
+          print(f"KS:        {m['ks']}")
+          print(f"PSI:       {m['psi']}")
+          print(f"SR11-7:    {'PASS' if m['sr117_pass'] else 'FAIL'}")
+          if not m["sr117_pass"]:
+              print("BLOCKED: Model does not meet SR 11-7 minimum thresholds")
+              sys.exit(1)
+          if m["gini"] < 0.20:
+              print(f"BLOCKED: Gini {m['gini']} below minimum 0.20")
+              sys.exit(1)
+          print("SR 11-7 gate: PASSED")
+          EOF
+
+      # ── Quality gate: Fairness ────────────────────────────────────────────
+      - name: Gate — Fairness (ECOA)
+        run: |
+          python - <<'EOF'
+          import json, sys
+          with open("reports/fairness_metrics.json") as f:
+              m = json.load(f)
+          print(f"Gender DPD: {m.get('gender_dpd', 'N/A')}")
+          print(f"Gender DIR: {m.get('gender_dir', 'N/A')}")
+          print(f"Fairness:   {'PASS' if m['fairness_pass'] else 'FAIL'}")
+          if not m["fairness_pass"]:
+              print("BLOCKED: Fairness thresholds not met — review fairness_report.json")
+              sys.exit(1)
+          print("Fairness gate: PASSED")
+          EOF
+
+      # ── Upload artifacts ──────────────────────────────────────────────────
+      - name: Upload validation reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: validation-reports-${{ github.sha }}
+          path: |
+            reports/validation_metrics.json
+            reports/fairness_metrics.json
+            reports/sr117_validation.json
+            reports/fairness_report.json
+            models/champion/model_metadata.json
+          retention-days: 30
+
+  # ─── 3. Weekly drift monitoring ───────────────────────────────────────────
+  drift-check:
+    name: Weekly Drift Monitor
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run drift check
+        run: |
+          python - <<'EOF'
+          import json, sys
+          from src.monitoring.baseline import check_drift
+          report = check_drift()
+          print(json.dumps(report, indent=2))
+          level = report["alert_level"]
+          print(f"\nAlert level: {level.upper()}")
+          if level == "retrain_required":
+              print("::warning::PSI above retrain threshold — action required")
+              with open("drift_action.txt", "w") as f:
+                  f.write("retrain")
+          elif level == "monitor":
+              print("::notice::PSI above alert threshold — monitoring recommended")
+          else:
+              print("Model stable — no action required")
+          EOF
+
+      - name: Trigger retrain pipeline if needed
+        if: hashFiles('drift_action.txt') != ''
+        run: gh workflow run "Credit Risk — CI/CD Pipeline" --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─── 4. Docker build & push ───────────────────────────────────────────────
+  docker-deploy:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: ml-pipeline
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/credit-risk-api:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/credit-risk-api:${{ github.sha }}
+
+      - name: Build and push Streamlit image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.streamlit
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/credit-risk-dashboard:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/credit-risk-dashboard:${{ github.sha }}
