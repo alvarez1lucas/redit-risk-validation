@@ -32,32 +32,44 @@ div[data-testid="metric-container"]{background:#f8f9fa;border-radius:10px;
 # ---------------------------------------------------------------------------
 @st.cache_resource
 def load_artifacts():
-    current_file = Path(__file__).resolve()
-    base = current_file.parent.parent
-    if (base / "models/champion/model.pkl").exists():
-        with open(base / "models/champion/model.pkl","rb") as f: 
+    arts = {}
+    # Esta línea define la raíz del proyecto de forma absoluta y segura
+    root = Path(__file__).resolve().parent.parent 
+
+    # Usamos 'root' directamente en cada línea
+    if (root / "models/champion/model.pkl").exists():
+        with open(root / "models/champion/model.pkl", "rb") as f:
             arts["model"] = pickle.load(f)
         
-        with open(base / "models/champion/model_metadata.json") as f: 
+        with open(root / "models/champion/model_metadata.json") as f:
             arts["metadata"] = json.load(f)
-
-        arts["X_train"] = pd.read_parquet(base/"data/processed/X_train.parquet")
-        arts["X_test"]  = pd.read_parquet(base/"data/processed/X_test.parquet")
-        arts["y_train"] = pd.read_parquet(base/"data/processed/y_train.parquet").iloc[:,0]
-        arts["y_test"]  = pd.read_parquet(base/"data/processed/y_test.parquet").iloc[:,0]
-        arts["raw_test"]= pd.read_parquet(base/"data/processed/test.parquet")
-        for k,p in [("explainer","models/champion/shap_explainer.pkl"),
-                    ("preprocessor","data/processed/preprocessor.pkl")]:
-            if (base/p).exists():
-                with open(base/p,"rb") as f: arts[k]=pickle.load(f)
-        if (base/"data/processed/feature_names.json").exists():
-            with open(base/"data/processed/feature_names.json") as f: arts["feature_names"]=json.load(f)
-        for rpt in ["sr117_validation","fairness_report"]:
-            p = base/f"reports/{rpt}.json"
-            if p.exists():
-                with open(p) as f: arts[rpt.replace("_report","").replace("_validation","")]=json.load(f)
-        if (base/"models/dl/dl_metadata.json").exists():
-            with open(base/"models/dl/dl_metadata.json") as f: arts["dl_meta"]=json.load(f)
+            
+        arts["X_train"] = pd.read_parquet(root / "data/processed/X_train.parquet")
+        arts["X_test"]  = pd.read_parquet(root / "data/processed/X_test.parquet")
+        arts["y_train"] = pd.read_parquet(root / "data/processed/y_train.parquet").iloc[:,0]
+        arts["y_test"]  = pd.read_parquet(root / "data/processed/y_test.parquet").iloc[:,0]
+        arts["raw_test"]= pd.read_parquet(root / "data/processed/test.parquet")
+        
+        for k, p in [("explainer", "models/champion/shap_explainer.pkl"),
+                    ("preprocessor", "data/processed/preprocessor.pkl")]:
+            if (root / p).exists():
+                with open(root / p, "rb") as f: 
+                    arts[k] = pickle.load(f)
+        
+        if (root / "data/processed/feature_names.json").exists():
+            with open(root / "data/processed/feature_names.json") as f: 
+                arts["feature_names"] = json.load(f)
+        
+        for rpt in ["sr117_validation", "fairness_report"]:
+            p_rpt = root / f"reports/{rpt}.json"
+            if p_rpt.exists():
+                with open(p_rpt) as f: 
+                    arts[rpt.replace("_report","").replace("_validation","")] = json.load(f)
+        
+        if (root / "models/dl/dl_metadata.json").exists():
+            with open(root / "models/dl/dl_metadata.json") as f: 
+                arts["dl_meta"] = json.load(f)
+        
         arts["demo"] = False
     else:
         arts = _demo()
