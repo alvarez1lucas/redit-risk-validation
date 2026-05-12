@@ -32,8 +32,8 @@ div[data-testid="metric-container"]{background:#f8f9fa;border-radius:10px;
 # ---------------------------------------------------------------------------
 @st.cache_resource
 def load_artifacts():
-    arts = {}
-    base = Path(".")
+    current_file_path = Path(__file__).resolve()
+    base = current_file_path.parent.parent
     if (base / "models/champion/model.pkl").exists():
         with open(base / "models/champion/model.pkl","rb") as f: arts["model"] = pickle.load(f)
         with open(base / "models/champion/model_metadata.json") as f: arts["metadata"] = json.load(f)
