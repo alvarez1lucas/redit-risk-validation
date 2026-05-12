@@ -32,11 +32,15 @@ div[data-testid="metric-container"]{background:#f8f9fa;border-radius:10px;
 # ---------------------------------------------------------------------------
 @st.cache_resource
 def load_artifacts():
-    current_file_path = Path(__file__).resolve()
-    base = current_file_path.parent.parent
+    current_file = Path(__file__).resolve()
+    base = current_file.parent.parent
     if (base / "models/champion/model.pkl").exists():
-        with open(base / "models/champion/model.pkl","rb") as f: arts["model"] = pickle.load(f)
-        with open(base / "models/champion/model_metadata.json") as f: arts["metadata"] = json.load(f)
+        with open(base / "models/champion/model.pkl","rb") as f: 
+            arts["model"] = pickle.load(f)
+        
+        with open(base / "models/champion/model_metadata.json") as f: 
+            arts["metadata"] = json.load(f)
+
         arts["X_train"] = pd.read_parquet(base/"data/processed/X_train.parquet")
         arts["X_test"]  = pd.read_parquet(base/"data/processed/X_test.parquet")
         arts["y_train"] = pd.read_parquet(base/"data/processed/y_train.parquet").iloc[:,0]
