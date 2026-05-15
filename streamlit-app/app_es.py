@@ -1,8 +1,3 @@
-"""
-Suite de Validación de Riesgo Crediticio — Español
-Secciones: Resumen | SR 11-7 | Fairness | Threshold | Simulador |
-           Comparativa de Modelos | Model Card
-"""
 import json, pickle, warnings
 from pathlib import Path
 import numpy as np
@@ -14,7 +9,7 @@ from sklearn.calibration import calibration_curve
 from sklearn.metrics import roc_auc_score, roc_curve, brier_score_loss
 warnings.filterwarnings("ignore")
 
-st.set_page_config(page_title="Validación Riesgo Crediticio",
+st.set_page_config(page_title="Credit Risk Validation Suite",
                    page_icon="📊", layout="wide",
                    initial_sidebar_state="expanded")
 st.markdown("""<style>
@@ -26,32 +21,18 @@ div[data-testid="metric-container"]{background:#f8f9fa;border-radius:10px;
     padding:.8rem;border:1px solid #e9ecef}
 </style>""", unsafe_allow_html=True)
 
+# ---------------------------------------------------------------------------
+# DEMO DATA
+# ---------------------------------------------------------------------------
 @st.cache_resource
-def cargar():
-    arts={}; base=Path(".")
-    if (base/"models/champion/model.pkl").exists():
-        with open(base/"models/champion/model.pkl","rb") as f: arts["model"]=pickle.load(f)
-        with open(base/"models/champion/model_metadata.json") as f: arts["metadata"]=json.load(f)
-        arts["X_train"]=pd.read_parquet(base/"data/processed/X_train.parquet")
-        arts["X_test"] =pd.read_parquet(base/"data/processed/X_test.parquet")
-        arts["y_train"]=pd.read_parquet(base/"data/processed/y_train.parquet").iloc[:,0]
-        arts["y_test"] =pd.read_parquet(base/"data/processed/y_test.parquet").iloc[:,0]
-        arts["raw_test"]=pd.read_parquet(base/"data/processed/test.parquet")
-        for k,p in [("explainer","models/champion/shap_explainer.pkl"),
-                    ("preprocessor","data/processed/preprocessor.pkl")]:
-            if (base/p).exists():
-                with open(base/p,"rb") as f: arts[k]=pickle.load(f)
-        if (base/"data/processed/feature_names.json").exists():
-            with open(base/"data/processed/feature_names.json") as f: arts["feature_names"]=json.load(f)
-        for rpt in ["sr117_validation","fairness_report"]:
-            p=base/f"reports/{rpt}.json"
-            if p.exists():
-                with open(p) as f: arts[rpt.replace("_report","").replace("_validation","")]=json.load(f)
-        if (base/"models/dl/dl_metadata.json").exists():
-            with open(base/"models/dl/dl_metadata.json") as f: arts["dl_meta"]=json.load(f)
-        arts["demo"]=False
-    else:
-        arts=_demo(); arts["demo"]=True
+def load_artifacts():
+    # Forzamos el modo demo directamente para evitar errores de archivos
+    arts = _demo()
+    arts["demo"] = True
+    
+    # Imprimimos en la consola de Streamlit para saber que estamos en demo
+    print("Running in Demo Mode")
+    
     return arts
 
 def _demo():
