@@ -85,15 +85,54 @@ def _demo():
 
 @st.cache_resource
 def cargar():
-    arts={}; base=Path(".")
-    if (base/"models/champion/model.pkl").exists():
-        with open(base/"models/champion/model.pkl","rb") as f: arts["model"]=pickle.load(f)
-        # ... resto de tu lógica de carga real aquí ...
-        arts["demo"]=False
+    arts = {}
+    base = Path(".")
+    
+    # IMPORTANTE: Verificamos si existen los archivos reales
+    path_modelo = base / "models/champion/model.pkl"
+    
+    if path_modelo.exists():
+        try:
+            with open(path_modelo, "rb") as f: 
+                arts["model"] = pickle.load(f)
+            
+            # Carga de datos reales (Asegúrate de que estos nombres sean correctos)
+            arts["X_test"] = pd.read_parquet(base / "data/processed/X_test.parquet")
+            arts["y_test"] = pd.read_parquet(base / "data/processed/y_test.parquet").iloc[:, 0]
+            arts["raw_test"] = pd.read_parquet(base / "data/processed/test.parquet")
+            
+            # Carga de reportes JSON
+            with open(base / "reports/sr117_validation.json") as f:
+                arts["sr117"] = json.load(f)
+            with open(base / "reports/fairness_report.json") as f:
+                arts["fairness"] = json.load(f)
+                
+            arts["demo"] = False
+        except Exception as e:
+            # Si falla la carga real por algún motivo, forzamos demo para que no rompa
+            st.error(f"Error cargando archivos reales: {e}")
+            arts = _demo()
+            arts["demo"] = True
     else:
-        arts=_demo()
-        arts["demo"]=True
+        # SI NO HAY ARCHIVOS, CARGA LA DEMO
+        arts = _demo()
+        arts["demo"] = True
+        
     return arts
+
+# --- EJECUCIÓN CRÍTICA ---
+arts = cargar()
+
+# Verificación de seguridad antes de asignar variables
+if "y_test" not in arts:
+    # Esto solo pasaría si _demo() no está devolviendo y_test
+    st.error("Error crítico: La clave 'y_test' no se encuentra en los artefactos.")
+    st.stop()
+
+# Ahora sí, asignamos
+y_test = arts["y_test"]
+raw    = arts["raw_test"]
+# ... resto del código
 
 # ---------------------------------------------------------------------------
 # SIDEBAR Y NAVEGACIÓN
