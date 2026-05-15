@@ -55,112 +55,82 @@ def cargar():
     return arts
 
 def _demo():
-    # Semilla para repetibilidad y tamaño de muestra
-    np.random.seed(42); n = 8000
+    # Semilla para que la demo sea consistente
+    np.random.seed(42); n=8000
     
-    # Generación de Target (Default) y Scores (Probabilidades)
-    y = np.random.binomial(1, 0.08, n)
-    # Distribución Beta para simular solapamiento realista entre pagadores y defaults
-    s = np.clip(y * np.random.beta(5, 2, n) + (1 - y) * np.random.beta(2, 5, n), 0.01, 0.99)
+    # Simulación de Target y Scores (Misma lógica que inglés)
+    y = np.random.binomial(1,0.08,n)
+    s = np.clip(y*np.random.beta(5,2,n)+(1-y)*np.random.beta(2,5,n),0.01,0.99)
+    s_nn   = np.clip(s+np.random.normal(0,0.03,n),0.01,0.99)
+    s_lstm = np.clip(s+np.random.normal(0.015,0.04,n),0.01,0.99)
     
-    # Scores de modelos competidores (para sección Comparativa)
-    s_nn   = np.clip(s + np.random.normal(0, 0.03, n), 0.01, 0.99)
-    s_lstm = np.clip(s + np.random.normal(0.015, 0.04, n), 0.01, 0.99)
+    # Variables de usuario
+    gender = np.random.choice(["M","F"],n,p=[0.58,0.42])
+    age    = np.random.normal(42,12,n).clip(18,75)
+    income = np.random.lognormal(11,0.6,n)
+    credit = np.random.lognormal(12,0.8,n)
     
-    # Variables Demográficas y Financieras
-    gender = np.random.choice(["M", "F"], n, p=[0.58, 0.42])
-    age    = np.random.normal(42, 12, n).clip(18, 75)
-    income = np.random.lognormal(11, 0.6, n)
-    credit = np.random.lognormal(12, 0.8, n)
-    
-    # Dataset de Características (X)
+    # DataFrame X (Features)
     X = pd.DataFrame({
-        "num__EXT_SOURCE_2": np.random.beta(3, 2, n),
-        "num__EXT_SOURCE_3": np.random.beta(3, 2, n),
-        "num__EXT_SOURCE_1": np.random.beta(3, 2, n),
-        "num__DAYS_BIRTH": -age * 365,
-        "num__AMT_CREDIT": credit,
-        "num__AMT_INCOME_TOTAL": income,
-        "num__DAYS_EMPLOYED": -np.random.exponential(1000, n),
-        "num__AMT_ANNUITY": credit / 18,
+        "num__EXT_SOURCE_2":np.random.beta(3,2,n),
+        "num__EXT_SOURCE_3":np.random.beta(3,2,n),
+        "num__EXT_SOURCE_1":np.random.beta(3,2,n),
+        "num__DAYS_BIRTH":-age*365,
+        "num__AMT_CREDIT":credit,
+        "num__AMT_INCOME_TOTAL":income,
+        "num__DAYS_EMPLOYED":-np.random.exponential(1000,n),
+        "num__AMT_ANNUITY":credit/18,
     })
     
-    # Dataset Raw (para Fairness)
-    raw = pd.DataFrame({"CODE_GENDER": gender, "age_years": age, "default": y})
+    # DataFrame Raw
+    raw = pd.DataFrame({"CODE_GENDER":gender,"age_years":age,"default":y})
     
-    # Métricas de Performance
-    auc = roc_auc_score(y, s); gini = round(2 * auc - 1, 4)
-    fpr, tpr, _ = roc_curve(y, s)
-    gini_nn   = round(2 * roc_auc_score(y, s_nn) - 1, 4)
-    gini_lstm = round(2 * roc_auc_score(y, s_lstm) - 1, 4)
+    # Métricas calculadas
+    auc  = roc_auc_score(y,s); gini = round(2*auc-1,4)
+    fpr,tpr,_ = roc_curve(y,s)
+    gini_nn   = round(2*roc_auc_score(y,s_nn)-1,4)
+    gini_lstm = round(2*roc_auc_score(y,s_lstm)-1,4)
     
-    # Cálculos de Fairness (Impacto Dispar)
-    ya = ((s < 0.50)).astype(int) # Tasa de aprobación simulada con umbral 0.5
-    rm = ya[gender == "M"].mean(); rf = ya[gender == "F"].mean()
-    dv = min(rm, rf) / max(rm, rf) if max(rm, rf) > 0 else 1.0
+    # Cálculos de Fairness
+    ya = ((s<0.50)).astype(int)
+    rm=ya[gender=="M"].mean(); rf=ya[gender=="F"].mean()
+    dv=min(rm,rf)/max(rm,rf) if max(rm,rf)>0 else 1.0
     
-    # Reporte SR 11-7 Traducido
+    # Diccionario SR 11-7 (Traducción exacta de las claves de tu JSON español)
     sr117 = {
-        "sr117_overall_pass": True,
-        "poder_discriminatorio": {
-            "gini": gini, "auc_roc": round(auc, 4),
-            "ks_statistic": round(max(tpr - fpr), 4), 
-            "gini_lift_baseline": round(gini - 0.14, 4)
-        },
-        "calibracion": {"hl_pvalue": 0.19, "bien_calibrado": True},
-        "estabilidad": {"psi": 0.06, "psi_status": "estable"},
-        "pruebas_estres": {
-            "baseline_gini": gini, 
-            "escenarios": {
-                "shock_ingreso_moderado": {
-                    "description": "Ingreso -25% (desempleo/inflación)",
-                    "gini": round(gini - 0.04, 4), "auc_degradacion": 0.02
-                },
-                "shock_ingreso_severo": {
-                    "description": "Ingreso -40%, crédito +30% (recesión severa)",
-                    "gini": round(gini - 0.08, 4), "auc_degradacion": 0.04
-                },
-                "deterioro_buro": {
-                    "description": "EXT_SOURCE -20% (crisis crediticia sistémica)",
-                    "gini": round(gini - 0.12, 4), "auc_degradacion": 0.06
-                },
-            }
-        },
-        "sensibilidad_top10": {
-            "num__EXT_SOURCE_2": 0.08, "num__EXT_SOURCE_3": 0.06,
-            "num__EXT_SOURCE_1": 0.04, "num__AMT_CREDIT": 0.02, "num__DAYS_BIRTH": 0.015
-        },
+        "sr117_overall_pass":True,
+        "poder_discriminatorio":{"gini":gini,"auc_roc":round(auc,4),
+            "ks_statistic":round(max(tpr-fpr),4),"gini_lift_baseline":round(gini-0.14,4)},
+        "calibracion":{"hl_pvalue":0.19,"bien_calibrated":True},
+        "estabilidad":{"psi":0.06,"psi_status":"stable"},
+        "stress_testing":{"baseline_gini":gini,"scenarios":{
+            "shock_ingreso_moderado":{"description":"Ingreso -25% (desempleo/inflación)",
+                "gini":round(gini-0.04,4),"auc_degradation":0.02},
+            "shock_ingreso_severo":{"description":"Ingreso -40%, crédito +30% (recesión severa)",
+                "gini":round(gini-0.08,4),"auc_degradation":0.04},
+            "deterioro_bureau":{"description":"EXT_SOURCE -20% (crisis crediticia sistémica)",
+                "gini":round(gini-0.12,4),"auc_degradation":0.06},
+        }},
+        "sensitivity_top10":{"num__EXT_SOURCE_2":0.08,"num__EXT_SOURCE_3":0.06,
+            "num__EXT_SOURCE_1":0.04,"num__AMT_CREDIT":0.02,"num__DAYS_BIRTH":0.015},
     }
     
-    # Reporte Fairness Traducido
-    fairness = {
-        "overall_fairness_passed": True, 
-        "results": {
-            "genero": {
-                "tasas_aprobacion": {"M": round(float(rm), 4), "F": round(float(rf), 4)},
-                "diferencia_paridad_demografica": round(float(rm - rf), 4),
-                "ratio_impacto_dispar": round(float(dv), 4),
-                "igualdad_oportunidades": {
-                    "M": {"tpr": 0.62, "fpr": 0.09}, "F": {"tpr": 0.60, "fpr": 0.08},
-                    "tpr_gap": 0.02, "fpr_gap": 0.01
-                },
-                "alertas_regulatorias": [], "paso": True,
-            }
-        }
-    }
+    # Diccionario Fairness (Traducción exacta de las claves de tu JSON español)
+    fairness = {"overall_fairness_passed":True,"results":{"genero":{
+        "tasas_aprobacion":{"M":round(float(rm),4),"F":round(float(rf),4)},
+        "diferencia_paridad_demografica":round(float(rm-rf),4),
+        "ratio_impacto_dispar":round(float(dv),4),
+        "igualdad_oportunidades":{"M":{"tpr":0.62,"fpr":0.09},"F":{"tpr":0.60,"fpr":0.08},
+                          "tpr_gap":0.02,"fpr_gap":0.01},
+        "regulatory_flags":[],"paso":True,
+    }}}
     
-    return {
-        "y_test": pd.Series(y), "y_prob": s, "y_score": s,
-        "y_score_nn": s_nn, "y_score_lstm": s_lstm,
-        "X_test": X, "X_train": X, "y_train": pd.Series(y), "raw_test": raw,
-        "sr117": sr117, "fairness": fairness, 
-        "gini_nn": gini_nn, "gini_lstm": gini_lstm,
-        "metadata": {
-            "champion": "XGBoost", "train_rows": 246008, "test_rows": 61503,
-            "feature_count": 87, 
-            "champion_metrics": {"gini": gini, "auc_roc": round(auc, 4)}
-        }
-    }
+    # Retorno idéntico al de inglés pero con etiquetas traducidas
+    return {"y_test":pd.Series(y),"y_score":s,"y_score_nn":s_nn,"y_score_lstm":s_lstm,
+            "X_test":X,"X_train":X,"y_train":pd.Series(y),"raw_test":raw,
+            "sr117":sr117,"fairness":fairness,"gini_nn":gini_nn,"gini_lstm":gini_lstm,
+            "metadata":{"champion":"XGBoost","train_rows":246008,"test_rows":61503,
+                        "feature_count":87,"champion_metrics":{"gini":gini,"auc_roc":round(auc,4)}}}
 with st.sidebar:
     st.markdown("## 📊 Navegación")
     pagina=st.radio("", [
