@@ -168,6 +168,8 @@ def roc_fig_es(yt, ys, label, color="#534AB7"):
 
 # Aquí continúa el resto de tu lógica de páginas (if pagina == "🏠 Resumen": ...)
 
+# Aquí continúa el resto de tu lógica de páginas (if pagina == "🏠 Resumen": ...)
+
 # PÁGINA 1 — RESUMEN
 if pagina=="🏠 Resumen":
     st.title("Suite de Validación de Riesgo Crediticio")
