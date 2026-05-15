@@ -7,11 +7,15 @@ import plotly.express as px
 import streamlit as st
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import roc_auc_score, roc_curve, brier_score_loss
+
 warnings.filterwarnings("ignore")
 
-st.set_page_config(page_title="Credit Risk Validation Suite",
+# Configuración de página
+st.set_page_config(page_title="Validación Riesgo Crediticio", 
                    page_icon="📊", layout="wide",
                    initial_sidebar_state="expanded")
+
+# Estilos CSS
 st.markdown("""<style>
 .pass-badge{background:#E1F5EE;color:#085041;padding:3px 10px;
             border-radius:12px;font-size:.8rem;font-weight:600}
@@ -22,21 +26,11 @@ div[data-testid="metric-container"]{background:#f8f9fa;border-radius:10px;
 </style>""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# DEMO DATA
+# FUNCIONES DE DATOS (IMPORTANTE EL ORDEN)
 # ---------------------------------------------------------------------------
-@st.cache_resource
-def cargar():
-    arts={}; base=Path(".")
-    if (base/"models/champion/model.pkl").exists():
-        # Lógica de carga real...
-        arts["demo"]=False
-    else:
-        arts=_demo()
-        arts["demo"]=True
-    return arts
 
-# --- 1. Definición de la Demo (Traducción fiel de la lógica de inglés) ---
 def _demo():
+    """Genera datos sintéticos idénticos a la versión en inglés pero con claves en español"""
     np.random.seed(42); n=8000
     y=np.random.binomial(1,0.08,n)
     s=np.clip(y*np.random.beta(5,2,n)+(1-y)*np.random.beta(2,5,n),0.01,0.99)
@@ -88,6 +82,23 @@ def _demo():
             "sr117":sr117,"fairness":fairness,"gini_nn":gini_nn,"gini_lstm":gini_lstm,
             "metadata":{"champion":"XGBoost","train_rows":246008,"test_rows":61503,
                         "feature_count":87,"champion_metrics":{"gini":gini,"auc_roc":round(auc,4)}}}
+
+@st.cache_resource
+def cargar():
+    arts={}; base=Path(".")
+    if (base/"models/champion/model.pkl").exists():
+        with open(base/"models/champion/model.pkl","rb") as f: arts["model"]=pickle.load(f)
+        # ... resto de tu lógica de carga real aquí ...
+        arts["demo"]=False
+    else:
+        arts=_demo()
+        arts["demo"]=True
+    return arts
+
+# ---------------------------------------------------------------------------
+# SIDEBAR Y NAVEGACIÓN
+# ---------------------------------------------------------------------------
+
 with st.sidebar:
     st.markdown("## 📊 Navegación")
     pagina=st.radio("", [
@@ -101,32 +112,61 @@ with st.sidebar:
     st.markdown("**Dataset**\nHome Credit Default Risk\nKaggle · 307K solicitudes")
     st.markdown("---")
     
-    # Aquí es donde se llama a la función
     arts=cargar()
     
     if arts.get("demo"):
         st.warning("⚠️ Modo demo")
     else:
         st.success("✅ Modelo real cargado")
-arts  =cargar()
-sr117 =arts.get("sr117",{}); fair=arts.get("fairness",{}); meta=arts.get("metadata",{})
-y_test=arts["y_test"]; raw=arts["raw_test"]
-y_score=arts["y_score"] if arts.get("demo") else arts["model"].predict_proba(arts["X_test"])[:,1]
-y_score_nn  =arts.get("y_score_nn",y_score)
-y_score_lstm=arts.get("y_score_lstm",y_score)
-disc=sr117.get("discriminatory_power",{}); cal=sr117.get("calibration",{}); stab=sr117.get("stability",{})
 
-def roc_fig_es(yt,ys,label,color="#534AB7"):
-    fpr,tpr,_=roc_curve(yt,ys); auc=roc_auc_score(yt,ys)
-    fig=go.Figure()
-    fig.add_trace(go.Scatter(x=fpr,y=tpr,mode="lines",name=f"{label} (AUC={auc:.3f})",
-                             line=dict(color=color,width=2.5)))
-    fig.add_trace(go.Scatter(x=[0,1],y=[0,1],mode="lines",name="Aleatorio",
-                             line=dict(color="gray",dash="dash",width=1)))
-    fig.update_layout(height=340,margin=dict(l=0,r=0,t=10,b=0),plot_bgcolor="white",
-                      xaxis_title="FPR",yaxis_title="TPR",legend=dict(x=0.55,y=0.05))
-    fig.update_xaxes(gridcolor="#f0f0f0"); fig.update_yaxes(gridcolor="#f0f0f0")
+# ---------------------------------------------------------------------------
+# PROCESAMIENTO DE VARIABLES GLOBALES
+# ---------------------------------------------------------------------------
+
+sr117 = arts.get("sr117", {})
+fair  = arts.get("fairness", {})
+meta  = arts.get("metadata", {})
+y_test = arts["y_test"]
+raw    = arts["raw_test"]
+
+# Lógica para obtener y_score (real vs demo)
+if arts.get("demo"):
+    y_score = arts["y_score"]
+else:
+    # Asegúrate de que arts["model"] exista antes de llamar a predict_proba
+    y_score = arts["model"].predict_proba(arts["X_test"])[:,1]
+
+y_score_nn   = arts.get("y_score_nn", y_score)
+y_score_lstm = arts.get("y_score_lstm", y_score)
+
+# Claves en español (coincidentes con _demo)
+disc = sr117.get("poder_discriminatorio", {})
+cal  = sr117.get("calibracion", {})
+stab = sr117.get("estabilidad", {})
+
+# ---------------------------------------------------------------------------
+# FUNCIONES GRÁFICAS
+# ---------------------------------------------------------------------------
+
+def roc_fig_es(yt, ys, label, color="#534AB7"):
+    fpr, tpr, _ = roc_curve(yt, ys)
+    auc_val = roc_auc_score(yt, ys)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=fpr, y=tpr, mode="lines", 
+                             name=f"{label} (AUC={auc_val:.3f})",
+                             line=dict(color=color, width=2.5)))
+    fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines", 
+                             name="Aleatorio",
+                             line=dict(color="gray", dash="dash", width=1)))
+    fig.update_layout(height=340, margin=dict(l=0, r=0, t=10, b=0), 
+                      plot_bgcolor="white",
+                      xaxis_title="FPR", yaxis_title="TPR",
+                      legend=dict(x=0.55, y=0.05))
+    fig.update_xaxes(gridcolor="#f0f0f0")
+    fig.update_yaxes(gridcolor="#f0f0f0")
     return fig
+
+# Aquí continúa el resto de tu lógica de páginas (if pagina == "🏠 Resumen": ...)
 
 # PÁGINA 1 — RESUMEN
 if pagina=="🏠 Resumen":
