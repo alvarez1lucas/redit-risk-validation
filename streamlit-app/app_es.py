@@ -25,88 +25,64 @@ div[data-testid="metric-container"]{background:#f8f9fa;border-radius:10px;
 # DEMO DATA
 # ---------------------------------------------------------------------------
 @st.cache_resource
-def load_artifacts():
-    # Forzamos el modo demo directamente para evitar errores de archivos
-    arts = _demo()
-    arts["demo"] = True
-    
-    # Imprimimos en la consola de Streamlit para saber que estamos en demo
-    print("Running in Demo Mode")
-    
+def cargar():
+    arts={}; base=Path(".")
+    if (base/"models/champion/model.pkl").exists():
+        # Lógica de carga real...
+        arts["demo"]=False
+    else:
+        arts=_demo()
+        arts["demo"]=True
     return arts
 
+# --- 1. Definición de la Demo (Traducción fiel de la lógica de inglés) ---
 def _demo():
-    # Semilla para que la demo sea consistente
     np.random.seed(42); n=8000
+    y=np.random.binomial(1,0.08,n)
+    s=np.clip(y*np.random.beta(5,2,n)+(1-y)*np.random.beta(2,5,n),0.01,0.99)
+    s_nn  =np.clip(s+np.random.normal(0,0.03,n),0.01,0.99)
+    s_lstm=np.clip(s+np.random.normal(0.015,0.04,n),0.01,0.99)
+    gender=np.random.choice(["M","F"],n,p=[0.58,0.42])
+    age=np.random.normal(42,12,n).clip(18,75)
+    income=np.random.lognormal(11,0.6,n); credit=np.random.lognormal(12,0.8,n)
     
-    # Simulación de Target y Scores (Misma lógica que inglés)
-    y = np.random.binomial(1,0.08,n)
-    s = np.clip(y*np.random.beta(5,2,n)+(1-y)*np.random.beta(2,5,n),0.01,0.99)
-    s_nn   = np.clip(s+np.random.normal(0,0.03,n),0.01,0.99)
-    s_lstm = np.clip(s+np.random.normal(0.015,0.04,n),0.01,0.99)
+    X=pd.DataFrame({"num__EXT_SOURCE_2":np.random.beta(3,2,n),"num__EXT_SOURCE_3":np.random.beta(3,2,n),
+                    "num__EXT_SOURCE_1":np.random.beta(3,2,n),"num__DAYS_BIRTH":-age*365,
+                    "num__AMT_CREDIT":credit,"num__AMT_INCOME_TOTAL":income,
+                    "num__DAYS_EMPLOYED":-np.random.exponential(1000,n),"num__AMT_ANNUITY":credit/18})
     
-    # Variables de usuario
-    gender = np.random.choice(["M","F"],n,p=[0.58,0.42])
-    age    = np.random.normal(42,12,n).clip(18,75)
-    income = np.random.lognormal(11,0.6,n)
-    credit = np.random.lognormal(12,0.8,n)
-    
-    # DataFrame X (Features)
-    X = pd.DataFrame({
-        "num__EXT_SOURCE_2":np.random.beta(3,2,n),
-        "num__EXT_SOURCE_3":np.random.beta(3,2,n),
-        "num__EXT_SOURCE_1":np.random.beta(3,2,n),
-        "num__DAYS_BIRTH":-age*365,
-        "num__AMT_CREDIT":credit,
-        "num__AMT_INCOME_TOTAL":income,
-        "num__DAYS_EMPLOYED":-np.random.exponential(1000,n),
-        "num__AMT_ANNUITY":credit/18,
-    })
-    
-    # DataFrame Raw
-    raw = pd.DataFrame({"CODE_GENDER":gender,"age_years":age,"default":y})
-    
-    # Métricas calculadas
-    auc  = roc_auc_score(y,s); gini = round(2*auc-1,4)
-    fpr,tpr,_ = roc_curve(y,s)
-    gini_nn   = round(2*roc_auc_score(y,s_nn)-1,4)
-    gini_lstm = round(2*roc_auc_score(y,s_lstm)-1,4)
-    
-    # Cálculos de Fairness
-    ya = ((s<0.50)).astype(int)
+    raw=pd.DataFrame({"CODE_GENDER":gender,"age_years":age,"default":y})
+    auc=roc_auc_score(y,s); gini=round(2*auc-1,4)
+    fpr,tpr,_=roc_curve(y,s)
+    gini_nn=round(2*roc_auc_score(y,s_nn)-1,4); gini_lstm=round(2*roc_auc_score(y,s_lstm)-1,4)
+    ya=((s<0.50)).astype(int)
     rm=ya[gender=="M"].mean(); rf=ya[gender=="F"].mean()
     dv=min(rm,rf)/max(rm,rf) if max(rm,rf)>0 else 1.0
-    
-    # Diccionario SR 11-7 (Traducción exacta de las claves de tu JSON español)
-    sr117 = {
-        "sr117_overall_pass":True,
-        "poder_discriminatorio":{"gini":gini,"auc_roc":round(auc,4),
-            "ks_statistic":round(max(tpr-fpr),4),"gini_lift_baseline":round(gini-0.14,4)},
-        "calibracion":{"hl_pvalue":0.19,"bien_calibrated":True},
-        "estabilidad":{"psi":0.06,"psi_status":"stable"},
-        "stress_testing":{"baseline_gini":gini,"scenarios":{
-            "shock_ingreso_moderado":{"description":"Ingreso -25% (desempleo/inflación)",
-                "gini":round(gini-0.04,4),"auc_degradation":0.02},
-            "shock_ingreso_severo":{"description":"Ingreso -40%, crédito +30% (recesión severa)",
-                "gini":round(gini-0.08,4),"auc_degradation":0.04},
-            "deterioro_bureau":{"description":"EXT_SOURCE -20% (crisis crediticia sistémica)",
-                "gini":round(gini-0.12,4),"auc_degradation":0.06},
-        }},
-        "sensitivity_top10":{"num__EXT_SOURCE_2":0.08,"num__EXT_SOURCE_3":0.06,
-            "num__EXT_SOURCE_1":0.04,"num__AMT_CREDIT":0.02,"num__DAYS_BIRTH":0.015},
-    }
-    
-    # Diccionario Fairness (Traducción exacta de las claves de tu JSON español)
-    fairness = {"overall_fairness_passed":True,"results":{"genero":{
+
+    sr117={"sr117_overall_pass":True,
+           "poder_discriminatorio":{"gini":gini,"auc_roc":round(auc,4),
+               "ks_statistic":round(max(tpr-fpr),4),"gini_lift_baseline":round(gini-0.14,4)},
+           "calibracion":{"hl_pvalue":0.19,"bien_calibrated":True},
+           "estabilidad":{"psi":0.06,"psi_status":"stable"},
+           "stress_testing":{"baseline_gini":gini,"scenarios":{
+               "shock_ingreso_moderado":{"description":"Ingreso -25% (desempleo/inflación)",
+                   "gini":round(gini-0.04,4),"auc_degradation":0.02},
+               "shock_ingreso_severo":{"description":"Ingreso -40%, crédito +30% (recesión severa)",
+                   "gini":round(gini-0.08,4),"auc_degradation":0.04},
+               "deterioro_bureau":{"description":"EXT_SOURCE -20% (crisis crediticia sistémica)",
+                   "gini":round(gini-0.12,4),"auc_degradation":0.06},
+           }},
+           "sensibilidad_top10":{"num__EXT_SOURCE_2":0.08,"num__EXT_SOURCE_3":0.06,
+               "num__EXT_SOURCE_1":0.04,"num__AMT_CREDIT":0.02,"num__DAYS_BIRTH":0.015}}
+
+    fairness={"overall_fairness_passed":True,"results":{"genero":{
         "tasas_aprobacion":{"M":round(float(rm),4),"F":round(float(rf),4)},
         "diferencia_paridad_demografica":round(float(rm-rf),4),
         "ratio_impacto_dispar":round(float(dv),4),
         "igualdad_oportunidades":{"M":{"tpr":0.62,"fpr":0.09},"F":{"tpr":0.60,"fpr":0.08},
                           "tpr_gap":0.02,"fpr_gap":0.01},
-        "regulatory_flags":[],"paso":True,
-    }}}
-    
-    # Retorno idéntico al de inglés pero con etiquetas traducidas
+        "regulatory_flags":[],"paso":True}}}
+
     return {"y_test":pd.Series(y),"y_score":s,"y_score_nn":s_nn,"y_score_lstm":s_lstm,
             "X_test":X,"X_train":X,"y_train":pd.Series(y),"raw_test":raw,
             "sr117":sr117,"fairness":fairness,"gini_nn":gini_nn,"gini_lstm":gini_lstm,
@@ -124,9 +100,14 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Dataset**\nHome Credit Default Risk\nKaggle · 307K solicitudes")
     st.markdown("---")
+    
+    # Aquí es donde se llama a la función
     arts=cargar()
-    st.warning("⚠️ Modo demo") if arts.get("demo") else st.success("✅ Modelo real cargado")
-
+    
+    if arts.get("demo"):
+        st.warning("⚠️ Modo demo")
+    else:
+        st.success("✅ Modelo real cargado")
 arts  =cargar()
 sr117 =arts.get("sr117",{}); fair=arts.get("fairness",{}); meta=arts.get("metadata",{})
 y_test=arts["y_test"]; raw=arts["raw_test"]
